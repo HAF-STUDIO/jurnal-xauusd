@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Jurnal XAUUSD</title>
+    <style>
+        :root {
+            --bg: #f4f7f6;
+            --primary: #2c3e50;
+            --gold: #d4af37;
+            --win: #27ae60;
+            --loss: #c0392b;
+            --white: #ffffff;
+        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); padding: 10px; color: #333; margin: 0; }
+        .container { max-width: 600px; margin: 20px auto; background: var(--white); padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: var(--gold); margin-top: 0;}
+        
+        /* Tab Navigation */
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+        .tab-btn { flex: 1; padding: 10px; background: none; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #7f8c8d; }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--gold); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form Layout */
+        .form-group { margin-bottom: 12px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button.submit-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        button.submit-btn:hover { background: #1a252f; }
+        #statusMessage { text-align: center; font-weight: bold; margin-top: 15px; }
+
+        /* Dashboard Layout */
+        .filter-section { margin-bottom: 20px; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .card { background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: center; border-left: 4px solid var(--primary); }
+        .card h4 { margin: 0 0 10px 0; font-size: 14px; color: #7f8c8d; }
+        .card .value { font-size: 24px; font-weight: bold; }
+        .val-win { color: var(--win); }
+        .val-loss { color: var(--loss); }
+        .full-width { grid-column: 1 / -1; border-left-color: var(--gold); }
+        
+        #loadingData { text-align: center; color: #7f8c8d; font-style: italic; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Pro Jurnal XAUUSD</h2>
+    
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('inputTab', this)">Input Entry</button>
+        <button class="tab-btn" onclick="switchTab('dashTab', this)">Dashboard</button>
+    </div>
+
+    <!-- TAB 1: FORM INPUT -->
+    <div id="inputTab" class="tab-content active">
+        <form id="tradingForm">
+            <div class="form-group">
+                <label>Tanggal & Waktu</label>
+                <input type="datetime-local" name="tanggal" required>
+            </div>
+            <div class="form-group">
+                <label>Posisi</label>
+                <select name="posisi" required>
+                    <option value="Buy">Buy</option>
+                    <option value="Sell">Sell</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex:1;"><label>Entry</label><input type="number" step="0.01" name="entry" required></div>
+                <div class="form-group" style="flex:1;"><label>Stop Loss</label><input type="number" step="0.01" name="sl" required></div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex:1;"><label>Take Profit</label><input type="number" step="0.01" name="tp" required></div>
+                <div class="form-group" style="flex:1;"><label>Exit (Opsional)</label><input type="number" step="0.01" name="exit" placeholder="Bila close"></div>
+            </div>
+            <div class="form-group">
+                <label>Catatan Setup</label>
+                <textarea name="catatan" rows="2"></textarea>
+            </div>
+            <button type="submit" class="submit-btn" id="submitBtn">Simpan Trading</button>
+        </form>
+        <div id="statusMessage"></div>
+    </div>
+
+    <!-- TAB 2: DASHBOARD BULANAN -->
+    <div id="dashTab" class="tab-content">
+        <div class="filter-section">
+            <label>Pilih Bulan Performa:</label>
+            <input type="month" id="monthFilter" onchange="processData()">
+        </div>
+        
+        <div id="loadingData">Mengambil data dari Google Sheets...</div>
+
+        <div class="dashboard-grid" id="dashboardMetrics" style="display: none;">
+            <div class="card full-width">
+                <h4>Net Pips Bulan Ini</h4>
+                <div class="value" id="netPips">0</div>
+            </div>
+            <div class="card">
+                <h4>Win Rate</h4>
+                <div class="value" id="winRate">0%</div>
+            </div>
+            <div class="card">
+                <h4>Total Trade Berjalan</h4>
+                <div class="value" id="totalTrades">0</div>
+            </div>
+            <div class="card">
+                <h4>Total Win</h4>
+                <div class="value val-win" id="totalWin">0</div>
+            </div>
+            <div class="card">
+                <h4>Total Loss</h4>
+                <div class="value val-loss" id="totalLoss">0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // MASUKKAN URL WEB APP ANDA DI SINI
+    const scriptURL = 'MASUKKAN_URL_WEB_APP_ANDA_DI_SINI'; 
+    let allTradingData = []; // Menyimpan data global
+
+    // Logika Tab
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btnElement.classList.add('active');
+
+        // Jika tab dashboard ditekan, ambil data dari gsheet
+        if(tabId === 'dashTab' && allTradingData.length === 0) {
+            fetchDataFromSheet();
+        }
+    }
+
+    // Logika Form Submit (POST)
+    const form = document.getElementById('tradingForm');
+    const btn = document.getElementById('submitBtn');
+    const statusDiv = document.getElementById('statusMessage');
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        btn.disabled = true; btn.innerHTML = "Menyimpan...";
+        
+        fetch(scriptURL, { method: 'POST', body: new FormData(form)})
+            .then(res => res.json())
+            .then(data => {
+                statusDiv.innerHTML = "Data berhasil disimpan!";
+                statusDiv.style.color = "green";
+                form.reset();
+                btn.disabled = false; btn.innerHTML = "Simpan Trading";
+                allTradingData = []; // Reset cache agar saat buka dashboard, data direfresh
+                setTimeout(() => { statusDiv.innerHTML = ""; }, 3000);
+            })
+            .catch(err => {
+                statusDiv.innerHTML = "Gagal menyimpan: " + err.message;
+                statusDiv.style.color = "red";
+                btn.disabled = false; btn.innerHTML = "Simpan Trading";
+            });
+    });
+
+    // Logika Fetch (GET) untuk Dashboard
+    function fetchDataFromSheet() {
+        document.getElementById('loadingData').style.display = 'block';
+        document.getElementById('dashboardMetrics').style.display = 'none';
+
+        fetch(scriptURL)
+            .then(res => res.json())
+            .then(response => {
+                allTradingData = response.data || [];
+                setDefaultMonth();
+                processData();
+            })
+            .catch(err => {
+                document.getElementById('loadingData').innerHTML = "Gagal memuat data statistik.";
+                document.getElementById('loadingData').style.color = "red";
+            });
+    }
+
+    function setDefaultMonth() {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        document.getElementById('monthFilter').value = `${yyyy}-${mm}`;
+    }
+
+    // Kalkulasi Data Bulanan
+    function processData() {
+        document.getElementById('loadingData').style.display = 'none';
+        document.getElementById('dashboardMetrics').style.display = 'grid';
+
+        const filterValue = document.getElementById('monthFilter').value; // format: YYYY-MM
+        if(!filterValue) return;
+
+        let totalTrades = 0, wins = 0, losses = 0, bep = 0, netPips = 0;
+
+        allTradingData.forEach(row => {
+            if(!row.Tanggal) return;
+            
+            // Pengecekan kecocokan bulan (YYYY-MM)
+            const tradeDate = row.Tanggal.substring(0, 7); 
+            if (tradeDate === filterValue) {
+                // Hanya hitung trade yang sudah selesai (ada hasilnya)
+                if(row.Hasil === "Win" || row.Hasil === "Loss" || row.Hasil === "BEP") {
+                    totalTrades++;
+                    let pipsValue = parseFloat(row.Pips) || 0;
+                    netPips += pipsValue;
+
+                    if(row.Hasil === "Win") wins++;
+                    else if(row.Hasil === "Loss") losses++;
+                    else if(row.Hasil === "BEP") bep++;
+                }
+            }
+        });
+
+        // Update UI
+        const winRate = totalTrades > 0 ? ((wins / totalTrades) * 100).toFixed(1) : 0;
+        
+        const netPipsElement = document.getElementById('netPips');
+        netPipsElement.innerText = netPips.toFixed(2) + " Pips";
+        netPipsElement.style.color = netPips > 0 ? "var(--win)" : (netPips < 0 ? "var(--loss)" : "#333");
+
+        document.getElementById('winRate').innerText = winRate + "%";
+        document.getElementById('totalTrades').innerText = totalTrades;
+        document.getElementById('totalWin').innerText = wins;
+        document.getElementById('totalLoss').innerText = losses;
+    }
+</script>
+
+</body>
+</html>
